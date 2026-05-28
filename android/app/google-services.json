@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1017950554459",
+    "project_id": "comunidad-one",
+    "storage_bucket": "comunidad-one.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1017950554459:android:fe057a255311b2bae2f27e",
+        "android_client_info": {
+          "package_name": "com.comunidad.comunidad_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAlccYVOzDCpSdaV2pHplNKmDfOiJ02EE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
