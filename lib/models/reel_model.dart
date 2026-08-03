@@ -1,108 +1,127 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-
-enum ReelStatus {
-  pending('pendiente', Colors.orange),
-  approved('aprobado', Colors.green),
-  rejected('rechazado', Color(0xFFF32836));
-
-  final String label;
-  final Color color;
-
-  const ReelStatus(this.label, this.color);
-}
 
 class ReelModel {
   String? id;
-  String videoUrl;
-  String thumbnailUrl;
-  String title;
-  String description;
-  String userId;
-  String userName;
-  String userAvatar;
-  String groupId;
+  String urlVideo;
+  String urlMiniatura;
+  String titulo;
+  String descripcion;
+  String usuarioId;
+  String nombreUsuario;
+  String avatarUsuario;
+  String categoria;        // cultura | anuncios | capacitacion | reconocimiento
+  String estado;           // pendiente | aprobado | rechazado
   int likes;
-  int comments;
-  int shares;
-  int views;
+  int comentarios;
+  int vistas;
   List<String> likedBy;
-  Timestamp createdAt;
-  bool isActive;
-  String status; // 'pending', 'approved', 'rejected'
-  String? rejectionReason;
-  Timestamp? approvedAt;
-  String? approvedBy;
+  Timestamp creadoEn;
+  Timestamp? aprobadoEn;
+  String? aprobadoPor;
+  String? motivoRechazo;
 
   ReelModel({
     this.id,
-    required this.videoUrl,
-    required this.thumbnailUrl,
-    required this.title,
-    required this.description,
-    required this.userId,
-    required this.userName,
-    required this.userAvatar,
-    required this.groupId,
+    required this.urlVideo,
+    this.urlMiniatura = '',
+    required this.titulo,
+    this.descripcion = '',
+    required this.usuarioId,
+    required this.nombreUsuario,
+    this.avatarUsuario = '',
+    this.categoria = 'cultura',
+    this.estado = 'pendiente',
     this.likes = 0,
-    this.comments = 0,
-    this.shares = 0,
-    this.views = 0,
-    this.likedBy = const [],
-    required this.createdAt,
-    this.isActive = true,
-    this.status = 'pending',
-    this.rejectionReason,
-    this.approvedAt,
-    this.approvedBy,
-  });
+    this.comentarios = 0,
+    this.vistas = 0,
+    List<String>? likedBy,
+    required this.creadoEn,
+    this.aprobadoEn,
+    this.aprobadoPor,
+    this.motivoRechazo,
+  }) : likedBy = likedBy ?? [];
 
-  Map<String, dynamic> toMap() {
-    return {
-      'videoUrl': videoUrl,
-      'thumbnailUrl': thumbnailUrl,
-      'title': title,
-      'description': description,
-      'userId': userId,
-      'userName': userName,
-      'userAvatar': userAvatar,
-      'groupId': groupId,
-      'likes': likes,
-      'comments': comments,
-      'shares': shares,
-      'views': views,
-      'likedBy': likedBy,
-      'createdAt': createdAt,
-      'isActive': isActive,
-      'status': status,
-      'rejectionReason': rejectionReason,
-      'approvedAt': approvedAt,
-      'approvedBy': approvedBy,
-    };
-  }
+  Map<String, dynamic> aMap() => {
+    'urlVideo': urlVideo,
+    'urlMiniatura': urlMiniatura,
+    'titulo': titulo,
+    'descripcion': descripcion,
+    'usuarioId': usuarioId,
+    'nombreUsuario': nombreUsuario,
+    'avatarUsuario': avatarUsuario,
+    'categoria': categoria,
+    'estado': estado,
+    'likes': likes,
+    'comentarios': comentarios,
+    'vistas': vistas,
+    'likedBy': likedBy,
+    'creadoEn': creadoEn,
+    'aprobadoEn': aprobadoEn,
+    'aprobadoPor': aprobadoPor,
+    'motivoRechazo': motivoRechazo,
+  };
 
-  factory ReelModel.fromMap(String id, Map<String, dynamic> map) {
+  factory ReelModel.desdeMap(String id, Map<String, dynamic> m) {
     return ReelModel(
       id: id,
-      videoUrl: map['videoUrl'] ?? '',
-      thumbnailUrl: map['thumbnailUrl'] ?? '',
-      title: map['title'] ?? '',
-      description: map['description'] ?? '',
-      userId: map['userId'] ?? '',
-      userName: map['userName'] ?? '',
-      userAvatar: map['userAvatar'] ?? '',
-      groupId: map['groupId'] ?? 'cultura',
-      likes: map['likes'] ?? 0,
-      comments: map['comments'] ?? 0,
-      shares: map['shares'] ?? 0,
-      views: map['views'] ?? 0,
-      likedBy: List<String>.from(map['likedBy'] ?? []),
-      createdAt: map['createdAt'] ?? Timestamp.now(),
-      isActive: map['isActive'] ?? true,
-      status: map['status'] ?? 'pending',
-      rejectionReason: map['rejectionReason'],
-      approvedAt: map['approvedAt'],
-      approvedBy: map['approvedBy'],
+      urlVideo: m['urlVideo'] ?? '',
+      urlMiniatura: m['urlMiniatura'] ?? '',
+      titulo: m['titulo'] ?? '',
+      descripcion: m['descripcion'] ?? '',
+      usuarioId: m['usuarioId'] ?? '',
+      nombreUsuario: m['nombreUsuario'] ?? '',
+      avatarUsuario: m['avatarUsuario'] ?? '',
+      categoria: m['categoria'] ?? 'cultura',
+      estado: m['estado'] ?? 'pendiente',
+      likes: m['likes'] ?? 0,
+      comentarios: m['comentarios'] ?? 0,
+      vistas: m['vistas'] ?? 0,
+      likedBy: List<String>.from(m['likedBy'] ?? []),
+      creadoEn: m['creadoEn'] ?? Timestamp.now(),
+      aprobadoEn: m['aprobadoEn'],
+      aprobadoPor: m['aprobadoPor'],
+      motivoRechazo: m['motivoRechazo'],
+    );
+  }
+}
+
+class ComentarioReelModel {
+  String? id;
+  String reelId;
+  String usuarioId;
+  String nombreUsuario;
+  String avatarUsuario;
+  String texto;
+  Timestamp creadoEn;
+
+  ComentarioReelModel({
+    this.id,
+    required this.reelId,
+    required this.usuarioId,
+    required this.nombreUsuario,
+    this.avatarUsuario = '',
+    required this.texto,
+    required this.creadoEn,
+  });
+
+  Map<String, dynamic> aMap() => {
+    'reelId': reelId,
+    'usuarioId': usuarioId,
+    'nombreUsuario': nombreUsuario,
+    'avatarUsuario': avatarUsuario,
+    'texto': texto,
+    'creadoEn': creadoEn,
+  };
+
+  factory ComentarioReelModel.desdeMap(String id, Map<String, dynamic> m) {
+    return ComentarioReelModel(
+      id: id,
+      reelId: m['reelId'] ?? '',
+      usuarioId: m['usuarioId'] ?? '',
+      nombreUsuario: m['nombreUsuario'] ?? '',
+      avatarUsuario: m['avatarUsuario'] ?? '',
+      texto: m['texto'] ?? '',
+      creadoEn: m['creadoEn'] ?? Timestamp.now(),
     );
   }
 }

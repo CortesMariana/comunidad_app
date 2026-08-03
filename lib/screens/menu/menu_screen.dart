@@ -1,245 +1,359 @@
-import 'package:comunidad_app/screens/menu/permisos/permisos_screen.dart';
-import 'package:comunidad_app/screens/menu/solicitud_vacantes/solicitud_vacantes_screen.dart';
-import 'package:comunidad_app/screens/menu/uniformes/uniformes_catalogo_screen.dart';
-import 'package:comunidad_app/screens/menu/vacaciones/vacaciones_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../config/usuario_config.dart';
+import '../perfil/perfil_screen.dart';
+import 'autorizaciones/autorizaciones_screen.dart';
 import 'checador/checador_screen.dart';
-import 'control_contenido/control_contenido_screen.dart';
+import 'vacaciones/vacaciones_screen.dart';
+import 'permisos/permisos_screen.dart';
+import 'uniformes/uniformes_screen.dart';
 import 'desempeno/desempeno_screen.dart';
+import 'vacantes/vacantes_screen.dart';
+import 'control_contenido/control_contenido_screen.dart';
 
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
 
-  final List<Map<String, dynamic>> _menuItems = const [
+  static const _modulos = [
     {
-      'icon': Icons.access_time_filled,
-      'title': 'Checador',
-      'subtitle': 'Registro de entradas y salidas',
-      'color': '005DB9',
+      'titulo': 'Checador',
+      'subtitulo': 'Entrada y salida',
+      'icono': Icons.fingerprint_rounded,
+      'color': Color(0xFF005DB9),
+      'fondo': Color(0xFFE8F0FB),
+      'ruta': 'checador',
     },
     {
-      'icon': Icons.beach_access,
-      'title': 'Vacaciones',
-      'subtitle': 'Solicitar y consultar vacaciones',
-      'color': '009BDF',
+      'titulo': 'Vacaciones',
+      'subtitulo': 'Solicitar días',
+      'icono': Icons.beach_access_rounded,
+      'color': Color(0xFF009BDF),
+      'fondo': Color(0xFFE0F4FC),
+      'ruta': 'vacaciones',
     },
     {
-      'icon': Icons.event_note,
-      'title': 'Permisos',
-      'subtitle': 'Solicitar permisos de ausencia',
-      'color': '005DB9',
+      'titulo': 'Permisos',
+      'subtitulo': 'Ausencias y salidas',
+      'icono': Icons.event_note_rounded,
+      'color': Color(0xFF7B61FF),
+      'fondo': Color(0xFFEEEBFF),
+      'ruta': 'permisos',
     },
     {
-      'icon': Icons.checkroom,
-      'title': 'Uniformes',
-      'subtitle': 'Solicitud de uniformes',
-      'color': '009BDF',
+      'titulo': 'Uniformes',
+      'subtitulo': 'Pedido de prendas',
+      'icono': Icons.checkroom_rounded,
+      'color': Color(0xFF00B37E),
+      'fondo': Color(0xFFE0F7F1),
+      'ruta': 'uniformes',
     },
     {
-      'icon': Icons.trending_up,
-      'title': 'Desempeño',
-      'subtitle': 'Evaluación y métricas',
-      'color': '005DB9',
+      'titulo': 'Desempeño',
+      'subtitulo': 'Evaluación y métricas',
+      'icono': Icons.insights_rounded,
+      'color': Color(0xFFFF6B35),
+      'fondo': Color(0xFFFFF0EB),
+      'ruta': 'desempeno',
     },
     {
-      'icon': Icons.work_outline,
-      'title': 'Solicitud de vacantes',
-      'subtitle': 'Pedir nuevo personal',
-      'color': '009BDF',
+      'titulo': 'Vacantes',
+      'subtitulo': 'Solicitar personal',
+      'icono': Icons.work_outline_rounded,
+      'color': Color(0xFF005DB9),
+      'fondo': Color(0xFFE8F0FB),
+      'ruta': 'vacantes',
     },
     {
-      'icon': Icons.admin_panel_settings,
-      'title': 'Control de contenido',
-      'subtitle': 'Moderación de reels y publicaciones',
-      'color': 'F32836',
+      'titulo': 'Autorizaciones',
+      'subtitulo': 'Aprobar solicitudes',
+      'icono': Icons.approval_rounded,
+      'color': Color(0xFF7B61FF),
+      'fondo': Color(0xFFEEEBFF),
+      'ruta': 'autorizaciones',
     },
   ];
-
-  void _navigateTo(BuildContext context, String title) {
-    Widget screen;
-
-    switch (title) {
-      case 'Checador':
-        screen = const ChecadorScreen();
-        break;
-      case 'Vacaciones':
-        screen = const VacacionesScreen();
-        break;
-      case 'Permisos':
-        screen = const PermisosScreen();
-        break;
-      case 'Uniformes':
-        screen = const UniformesCatalogoScreen();
-        break;
-      case 'Desempeño':
-        screen = const DesempenoScreen();
-        break;
-      case 'Solicitud de vacantes':
-        screen = const SolicitudVacantesScreen();
-        break;
-      case 'Control de contenido':
-        screen = const ControlContenidoScreen();
-        break;
-      default:
-        return; // Salir si no coincide con ninguna opción
-    }
-
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Header
+      backgroundColor: const Color(0xFFF5F6FA),
+      body: CustomScrollView(
+        slivers: [
+          _buildAppBar(context),
+          SliverToBoxAdapter(child: _buildTarjetaUsuario(context)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+              child: Text('Operaciones',
+                  style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1A1A2E))),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.4,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                    (context, i) => _TarjetaModulo(
+                  modulo: _modulos[i],
+                  onTap: () => _navegar(context, _modulos[i]['ruta'] as String),
+                ),
+                childCount: _modulos.length,
+              ),
+            ),
+          ),
+          if (UsuarioConfig.esModerador)
             SliverToBoxAdapter(
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF005DB9), Color(0xFF009BDF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(32),
-                    bottomRight: Radius.circular(32),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: _TarjetaControlContenido(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ControlContenidoScreen()),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Text(
-                      'Bienvenido 👋',
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
+    );
+  }
+
+  SliverAppBar _buildAppBar(BuildContext context) {
+    return SliverAppBar(
+      floating: true,
+      snap: true,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      title: Text('Menú',
+          style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1A1A2E))),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: Colors.grey[100]),
+      ),
+    );
+  }
+
+  Widget _buildTarjetaUsuario(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PerfilDetalleScreen()),
+      ),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF005DB9), Color(0xFF009BDF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  UsuarioConfig.nombreUsuario.isNotEmpty
+                      ? UsuarioConfig.nombreUsuario[0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(UsuarioConfig.nombreUsuario,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    Text(
-                      'Mariana Cortes',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Coordinadora de RH',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
                           color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700)),
+                  Text(UsuarioConfig.puestoUsuario,
+                      style: GoogleFonts.poppins(
+                          color: Colors.white70, fontSize: 13)),
+                  Text(UsuarioConfig.departamento,
+                      style: GoogleFonts.poppins(
+                          color: Colors.white60, fontSize: 12)),
+                ],
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            // Grid de menú
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.1,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final item = _menuItems[index];
-                    return _buildMenuCard(context, item);
-                  },
-                  childCount: _menuItems.length,
-                ),
+            Container(
+              padding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                UsuarioConfig.rol.toUpperCase(),
+                style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded,
+                color: Colors.white70, size: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMenuCard(BuildContext context, Map<String, dynamic> item) {
-    final Color color = Color(int.parse('0xFF${item['color']}'));
+  void _navegar(BuildContext context, String ruta) {
+    final pantallas = {
+      'checador': const ChecadorScreen(),
+      'vacaciones': const VacacionesScreen(),
+      'permisos': const PermisosScreen(),
+      'uniformes': const UniformesScreen(),
+      'desempeno': const DesempenoScreen(),
+      'vacantes': const VacantesScreen(),
+      'autorizaciones': const AutorizacionesScreen(),
+    };
+    final pantalla = pantallas[ruta];
+    if (pantalla == null) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => pantalla));
+  }
+}
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _navigateTo(context, item['title']),
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.2),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+// ─────────────────────────────────────────────────────────────────────────────
+// TARJETA DE MÓDULO
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TarjetaModulo extends StatelessWidget {
+  final Map<String, dynamic> modulo;
+  final VoidCallback onTap;
+
+  const _TarjetaModulo({required this.modulo, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: modulo['fondo'] as Color,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 65,
-                height: 65,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [color, color.withOpacity(0.7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(item['icon'], size: 30, color: Colors.white),
+              child: Icon(modulo['icono'] as IconData,
+                  color: modulo['color'] as Color, size: 22),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(modulo['titulo'] as String,
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1A2E))),
+                Text(modulo['subtitulo'] as String,
+                    style: GoogleFonts.poppins(
+                        fontSize: 11, color: Colors.grey[500])),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TARJETA CONTROL DE CONTENIDO (solo moderadores)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TarjetaControlContenido extends StatelessWidget {
+  final VoidCallback onTap;
+  const _TarjetaControlContenido({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF0F0),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFF32836).withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF32836).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
               ),
-              const SizedBox(height: 12),
-              Text(
-                item['title'],
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF1A1A1A),
-                ),
+              child: const Icon(Icons.admin_panel_settings_rounded,
+                  color: Color(0xFFF32836), size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Control de contenido',
+                      style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1A1A2E))),
+                  Text('Moderación · Reportes · Aprobaciones',
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: Colors.grey[500])),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                item['subtitle'],
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  color: Colors.grey[500],
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFFF32836)),
+          ],
         ),
       ),
     );

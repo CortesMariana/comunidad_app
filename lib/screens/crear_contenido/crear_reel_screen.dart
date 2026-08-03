@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/reel_model.dart';
 import '../../services/reels/reels_service.dart';
-import '../../config/user_config.dart';
+import '../../config/usuario_config.dart';
 
 class CrearReelScreen extends StatefulWidget {
   const CrearReelScreen({super.key});
@@ -18,331 +17,500 @@ class CrearReelScreen extends StatefulWidget {
 
 class _CrearReelScreenState extends State<CrearReelScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _tituloCtrl = TextEditingController();
+  final _descripcionCtrl = TextEditingController();
+  final ReelsService _service = ReelsService();
+  final ImagePicker _picker = ImagePicker();
 
-  String _selectedGroup = 'cultura';
-  File? _selectedVideo;
-  File? _selectedThumbnail;
-  bool _isUploading = false;
-  double _uploadProgress = 0;
-
-  // Para previsualización de video
-  VideoPlayerController? _videoPreviewController;
-  bool _isVideoInitialized = false;
-
-  final ReelsService _reelsService = ReelsService();
-  final FirebaseStorage _storage = FirebaseStorage.instance;
-
-  Future<void> _pickVideo() async {
-    final picker = ImagePicker();
-    final video = await picker.pickVideo(source: ImageSource.gallery);
-
-    if (video != null) {
-      // Limpiar controller anterior
-      if (_videoPreviewController != null) {
-        _videoPreviewController!.dispose();
-      }
-
-      setState(() {
-        _selectedVideo = File(video.path);
-        _isVideoInitialized = false;
-      });
-
-      // Inicializar previsualización
-      _videoPreviewController = VideoPlayerController.file(File(video.path));
-      await _videoPreviewController!.initialize();
-      setState(() {
-        _isVideoInitialized = true;
-      });
-      _videoPreviewController!.play();
-    }
-  }
-
-  Future<void> _pickThumbnail() async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
-
-    if (image != null) {
-      setState(() {
-        _selectedThumbnail = File(image.path);
-      });
-    }
-  }
-
-  Future<void> _uploadReel() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedVideo == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona un video')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isUploading = true;
-      _uploadProgress = 0;
-    });
-
-    try {
-      // Subir video
-      final videoFileName = 'reels/${DateTime.now().millisecondsSinceEpoch}_video.mp4';
-      final videoRef = _storage.ref().child(videoFileName);
-
-      final videoUploadTask = videoRef.putFile(_selectedVideo!);
-      videoUploadTask.snapshotEvents.listen((event) {
-        setState(() {
-          _uploadProgress = event.bytesTransferred / event.totalBytes;
-        });
-      });
-
-      await videoUploadTask;
-      final videoUrl = await videoRef.getDownloadURL();
-
-      // Subir thumbnail si existe
-      String thumbnailUrl = '';
-      if (_selectedThumbnail != null) {
-        final thumbFileName = 'reels/thumbnails/${DateTime.now().millisecondsSinceEpoch}_thumb.jpg';
-        final thumbRef = _storage.ref().child(thumbFileName);
-        await thumbRef.putFile(_selectedThumbnail!);
-        thumbnailUrl = await thumbRef.getDownloadURL();
-      }
-
-      // Crear reel en Firestore (se guarda en reels-dev como pendiente)
-      final newReel = ReelModel(
-        videoUrl: videoUrl,
-        thumbnailUrl: thumbnailUrl,
-        title: _titleController.text,
-        description: _descriptionController.text,
-        userId: UserConfig.currentUserId,
-        userName: UserConfig.currentUserName,
-        userAvatar: UserConfig.currentUserAvatar,
-        groupId: _selectedGroup,
-        createdAt: Timestamp.now(),
-        status: 'pending', // Pendiente de aprobación
-      );
-
-      final reelId = await _reelsService.uploadReel(newReel);
-
-      if (reelId != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡Reel subido exitosamente! Pasará por revisión antes de ser publicado.'),
-            backgroundColor: Color(0xFF005DB9),
-          ),
-        );
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al subir: $e')),
-      );
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
-    }
-  }
+  File? _videoFile;
+  File? _miniaturaFile;
+  VideoPlayerController? _previewCtrl;
+  String _categoriaSeleccionada = 'cultura';
+  bool _subiendo = false;
+  double _progreso = 0;
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _videoPreviewController?.dispose();
+    _tituloCtrl.dispose();
+    _descripcionCtrl.dispose();
+    _previewCtrl?.dispose();
     super.dispose();
+  }
+
+  Future<void> _seleccionarVideo() async {
+    final video = await _picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 3),
+    );
+    if (video == null) return;
+
+    final archivo = File(video.path);
+    final ctrl = VideoPlayerController.file(archivo);
+    await ctrl.initialize();
+
+    _previewCtrl?.dispose();
+    setState(() {
+      _videoFile = archivo;
+      _previewCtrl = ctrl;
+    });
+    ctrl.play();
+  }
+
+  Future<void> _seleccionarMiniatura() async {
+    final imagen = await _picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 80);
+    if (imagen == null) return;
+    setState(() => _miniaturaFile = File(imagen.path));
+  }
+
+  Future<void> _publicar() async {
+    if (_videoFile == null) {
+      _mostrarError('Selecciona un video');
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _subiendo = true;
+      _progreso = 0;
+    });
+
+    // Subir video con progreso
+    final urlVideo = await _service.subirVideo(
+      _videoFile!,
+      onProgress: (p) => setState(() => _progreso = p * 0.8),
+    );
+
+    if (urlVideo == null) {
+      _mostrarError('Error al subir el video');
+      setState(() => _subiendo = false);
+      return;
+    }
+
+    // Subir miniatura si hay
+    String urlMiniatura = '';
+    if (_miniaturaFile != null) {
+      setState(() => _progreso = 0.85);
+      urlMiniatura = await _service.subirMiniatura(_miniaturaFile!) ?? '';
+    }
+
+    setState(() => _progreso = 0.95);
+
+    final reel = ReelModel(
+      urlVideo: urlVideo,
+      urlMiniatura: urlMiniatura,
+      titulo: _tituloCtrl.text.trim(),
+      descripcion: _descripcionCtrl.text.trim(),
+      usuarioId: UsuarioConfig.usuarioId,
+      nombreUsuario: UsuarioConfig.nombreUsuario,
+      avatarUsuario: UsuarioConfig.avatarUsuario,
+      categoria: _categoriaSeleccionada,
+      estado: 'pendiente',
+      creadoEn: Timestamp.now(),
+    );
+
+    final id = await _service.crear(reel);
+    setState(() => _progreso = 1.0);
+
+    if (!mounted) return;
+
+    if (id != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Reel enviado a revisión. Se publicará cuando sea aprobado.',
+              style: GoogleFonts.poppins()),
+          backgroundColor: const Color(0xFF005DB9),
+          behavior: SnackBarBehavior.floating,
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      Navigator.pop(context);
+    } else {
+      _mostrarError('Error al crear el reel');
+      setState(() => _subiendo = false);
+    }
+  }
+
+  void _mostrarError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: GoogleFonts.poppins()),
+      backgroundColor: const Color(0xFFF32836),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final groups = _reelsService.getGroups();
-
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text('Crear Reel'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF005DB9),
+        title: Text('Crear Reel',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        actions: [
+          if (!_subiendo)
+            TextButton(
+              onPressed: _publicar,
+              child: Text('Publicar',
+                  style: GoogleFonts.poppins(
+                      color: const Color(0xFF005DB9),
+                      fontWeight: FontWeight.w600)),
+            ),
+        ],
       ),
-      body: SingleChildScrollView(
+      body: _subiendo
+          ? _buildSubiendo()
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Selección de video con previsualización
-              GestureDetector(
-                onTap: _pickVideo,
-                child: Container(
-                  height: 400,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey[800]!),
-                  ),
-                  child: _selectedVideo != null && _isVideoInitialized
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: VideoPlayer(_videoPreviewController!),
-                  )
-                      : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.video_library, size: 50, color: Colors.grey[600]),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Seleccionar video',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'MP4, MOV hasta 100MB',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _buildSelectorVideo(),
               const SizedBox(height: 16),
-
-              // Miniatura
-              GestureDetector(
-                onTap: _pickThumbnail,
-                child: Container(
-                  height: 100,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: _selectedThumbnail != null
-                      ? ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.file(
-                      _selectedThumbnail!,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                    ),
-                  )
-                      : Center(
-                    child: Text(
-                      'Seleccionar miniatura (opcional)',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  ),
-                ),
-              ),
+              _buildCampos(),
               const SizedBox(height: 16),
-
-              // Título
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Título del reel',
-                  hintText: 'Ej: ¡Gran anuncio!',
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Ingresa un título';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // Descripción
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  hintText: 'Cuéntales de qué trata...',
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-
-              // Categoría
-              DropdownButtonFormField<String>(
-                value: _selectedGroup,
-                decoration: const InputDecoration(
-                  labelText: 'Categoría',
-                ),
-                items: groups.map<DropdownMenuItem<String>>((group) {
-                  return DropdownMenuItem<String>(
-                    value: group['id'] as String,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: Color(group['color'] as int),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(group['name'] as String),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedGroup = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-
-              // Mensaje de aprobación
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange[700]),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Los reels pasan por un proceso de revisión antes de ser publicados.',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange[700]),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildSelectorCategoria(),
               const SizedBox(height: 16),
-
-              // Botón de subir
-              if (_isUploading)
-                Column(
-                  children: [
-                    LinearProgressIndicator(value: _uploadProgress),
-                    const SizedBox(height: 8),
-                    Text('Subiendo: ${(_uploadProgress * 100).toStringAsFixed(0)}%'),
-                  ],
-                )
-              else
-                ElevatedButton(
-                  onPressed: _uploadReel,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF32836),
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  ),
-                  child: const Text(
-                    'SUBIR REEL',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
+              _buildSelectorMiniatura(),
+              const SizedBox(height: 32),
+              _buildBotonPublicar(),
+              const SizedBox(height: 32),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildSubiendo() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF005DB9), Color(0xFF009BDF)],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cloud_upload_rounded,
+                  color: Colors.white, size: 48),
+            ),
+            const SizedBox(height: 32),
+            Text('Subiendo reel...',
+                style: GoogleFonts.poppins(
+                    fontSize: 18, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text('${(_progreso * 100).toInt()}%',
+                style: GoogleFonts.poppins(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF005DB9))),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: _progreso,
+                minHeight: 8,
+                backgroundColor: Colors.grey[200],
+                valueColor: const AlwaysStoppedAnimation(Color(0xFF005DB9)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('No cierres la aplicación',
+                style: GoogleFonts.poppins(
+                    fontSize: 13, color: Colors.grey[500])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectorVideo() {
+    return GestureDetector(
+      onTap: _seleccionarVideo,
+      child: Container(
+        height: 320,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: _previewCtrl != null && _previewCtrl!.value.isInitialized
+            ? Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: _previewCtrl!.value.size.width,
+                    height: _previewCtrl!.value.size.height,
+                    child: VideoPlayer(_previewCtrl!),
+                  ),
+                ),
+              ),
+            ),
+            // Overlay botón cambiar
+            Positioned(
+              top: 12,
+              right: 12,
+              child: GestureDetector(
+                onTap: _seleccionarVideo,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('Cambiar',
+                      style: GoogleFonts.poppins(
+                          color: Colors.white, fontSize: 12)),
+                ),
+              ),
+            ),
+            // Duración
+            Positioned(
+              bottom: 12,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _formatDuracion(
+                      _previewCtrl!.value.duration),
+                  style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        )
+            : Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.video_library_rounded,
+                  color: Colors.white60, size: 32),
+            ),
+            const SizedBox(height: 16),
+            Text('Toca para seleccionar un video',
+                style: GoogleFonts.poppins(
+                    color: Colors.white60, fontSize: 15)),
+            const SizedBox(height: 6),
+            Text('Máximo 3 minutos',
+                style: GoogleFonts.poppins(
+                    color: Colors.white38, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCampos() {
+    return Column(
+      children: [
+        TextFormField(
+          controller: _tituloCtrl,
+          decoration: InputDecoration(
+            labelText: 'Título',
+            labelStyle: GoogleFonts.poppins(),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          style: GoogleFonts.poppins(),
+          validator: (v) =>
+          v == null || v.trim().isEmpty ? 'El título es obligatorio' : null,
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _descripcionCtrl,
+          decoration: InputDecoration(
+            labelText: 'Descripción (opcional)',
+            labelStyle: GoogleFonts.poppins(),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          style: GoogleFonts.poppins(),
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSelectorCategoria() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Categoría',
+              style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: ReelsService.categorias.map((cat) {
+              final seleccionada =
+                  _categoriaSeleccionada == cat['valor'];
+              return GestureDetector(
+                onTap: () =>
+                    setState(() => _categoriaSeleccionada = cat['valor']!),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: seleccionada
+                        ? const Color(0xFF005DB9)
+                        : const Color(0xFFF5F6FA),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: seleccionada
+                          ? const Color(0xFF005DB9)
+                          : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: Text(
+                    cat['etiqueta']!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: seleccionada
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                      color: seleccionada
+                          ? Colors.white
+                          : const Color(0xFF1A1A2E),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectorMiniatura() {
+    return GestureDetector(
+      onTap: _seleccionarMiniatura,
+      child: Container(
+        height: 80,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Row(
+          children: [
+            if (_miniaturaFile != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(15)),
+                child: Image.file(_miniaturaFile!,
+                    width: 80, height: 80, fit: BoxFit.cover),
+              )
+            else
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(15)),
+                ),
+                child: Icon(Icons.image_outlined,
+                    color: Colors.grey[400], size: 28),
+              ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Miniatura',
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(
+                    _miniaturaFile != null
+                        ? 'Toca para cambiar'
+                        : 'Opcional — se usa como preview',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Icon(Icons.chevron_right_rounded,
+                  color: Colors.grey[400]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBotonPublicar() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _publicar,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF005DB9),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+        ),
+        child: Text('Enviar a revisión',
+            style: GoogleFonts.poppins(
+                fontSize: 15, fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  String _formatDuracion(Duration d) {
+    final min = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seg = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$min:$seg';
   }
 }

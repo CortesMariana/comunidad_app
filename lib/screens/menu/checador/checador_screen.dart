@@ -7,16 +7,12 @@ class ChecadorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: Text('Checador', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.white,
+        title: Text('Checador',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
       ),
-      body: Center(
-        child: Text(
-          'Pantalla de Checador - Próximamente',
-          style: GoogleFonts.poppins(),
-        ),
-      ),
+      body: const Center(child: Text('Próximamente')),
     );
   }
 }
